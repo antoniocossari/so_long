@@ -9,24 +9,40 @@
 #define MAX_WIDTH 50
 #define MAX_HEIGHT 50
 
+typedef struct s_sprites
+{
+    void    *floor;
+    void    *wall;
+    void    *player;
+    void    *collectible;
+    void    *exit_locked;
+    void    *exit_open;
+    void    *enemy_norminette;
+    void    *enemy_segfault;
+    void    *enemy_peer;
+    void    *bonus_coin;
+} t_sprites;
+
 typedef struct s_game
 {
-    void    *mlx;
-    void    *window;
-    char    map[MAX_HEIGHT][MAX_WIDTH];  // Fixed size arrays instead of malloc
-    int     map_width;
-    int     map_height;
-    int     player_x;
-    int     player_y;
-    int     collectibles;
-    int     collected;
-    int     moves;
-    int     score;
-    int     current_eval;
-    int     victory;
+    void        *mlx;
+    void        *window;
+    char        map[MAX_HEIGHT][MAX_WIDTH];  // Fixed size arrays instead of malloc
+    int         map_width;
+    int         map_height;
+    int         player_x;
+    int         player_y;
+    int         collectibles;
+    int         collected;
+    int         moves;
+    int         score;
+    int         current_eval;
+    int         victory;
+    t_sprites   sprites;  // Sprite assets
 } t_game;
 
 // Function prototypes
+int     load_sprites(t_game *game);
 int     load_map(t_game *game, char *filename);
 int     next_eval(t_game *game);
 void    render_game(t_game *game);
@@ -55,6 +71,15 @@ int main(int argc, char **argv)
     }
 
     printf("✅ MLX initialized\n");
+
+    // Load sprites first
+    if (!load_sprites(&game))
+    {
+        printf("❌ Error: Failed to load sprites\n");
+        return (1);
+    }
+
+    printf("✅ Sprites loaded\n");
 
     // Initialize game state
     game.score = 0;
@@ -104,6 +129,58 @@ int main(int argc, char **argv)
     mlx_loop(game.mlx);
 
     return (0);
+}
+
+int load_sprites(t_game *game)
+{
+    int w, h;
+
+    printf("🎨 Loading sprites...\n");
+
+    // Load 32x32 sprites with detailed debug
+    printf("📂 Loading floor...\n");
+    game->sprites.floor = mlx_xpm_file_to_image(game->mlx, "assets/floor_32.xpm", &w, &h);
+    if (!game->sprites.floor) { printf("❌ Failed to load floor_32.xpm\n"); return (0); }
+
+    printf("📂 Loading wall...\n");
+    game->sprites.wall = mlx_xpm_file_to_image(game->mlx, "assets/wall_desk_32.xpm", &w, &h);
+    if (!game->sprites.wall) { printf("❌ Failed to load wall_desk_32.xpm\n"); return (0); }
+
+    printf("📂 Loading player...\n");
+    game->sprites.player = mlx_xpm_file_to_image(game->mlx, "assets/player_peer_32.xpm", &w, &h);
+    if (!game->sprites.player) { printf("❌ Failed to load player_peer_32.xpm\n"); return (0); }
+
+    printf("📂 Loading collectible...\n");
+    game->sprites.collectible = mlx_xpm_file_to_image(game->mlx, "assets/collectible_c_32.xpm", &w, &h);
+    if (!game->sprites.collectible) { printf("❌ Failed to load collectible_c_32.xpm\n"); return (0); }
+
+    printf("📂 Loading exit_locked...\n");
+    game->sprites.exit_locked = mlx_xpm_file_to_image(game->mlx, "assets/exit_locked_32.xpm", &w, &h);
+    if (!game->sprites.exit_locked) { printf("❌ Failed to load exit_locked_32.xpm\n"); return (0); }
+
+    printf("📂 Loading exit_open...\n");
+    game->sprites.exit_open = mlx_xpm_file_to_image(game->mlx, "assets/exit_open_32.xpm", &w, &h);
+    if (!game->sprites.exit_open) { printf("❌ Failed to load exit_open_32.xpm\n"); return (0); }
+
+    printf("📂 Loading bonus_coin...\n");
+    game->sprites.bonus_coin = mlx_xpm_file_to_image(game->mlx, "assets/bonus_coin_32.xpm", &w, &h);
+    if (!game->sprites.bonus_coin) { printf("❌ Failed to load bonus_coin_32.xpm\n"); return (0); }
+
+    // Load 64x64 enemies
+    printf("📂 Loading enemy_norminette...\n");
+    game->sprites.enemy_norminette = mlx_xpm_file_to_image(game->mlx, "assets/enemy_norminette_64.xpm", &w, &h);
+    if (!game->sprites.enemy_norminette) { printf("❌ Failed to load enemy_norminette_64.xpm\n"); return (0); }
+
+    printf("📂 Loading enemy_segfault...\n");
+    game->sprites.enemy_segfault = mlx_xpm_file_to_image(game->mlx, "assets/enemy_segfault_64.xpm", &w, &h);
+    if (!game->sprites.enemy_segfault) { printf("❌ Failed to load enemy_segfault_64.xpm\n"); return (0); }
+
+    printf("📂 Loading enemy_peer...\n");
+    game->sprites.enemy_peer = mlx_xpm_file_to_image(game->mlx, "assets/enemy_peer_64.xpm", &w, &h);
+    if (!game->sprites.enemy_peer) { printf("❌ Failed to load enemy_peer_64.xpm\n"); return (0); }
+
+    printf("✅ All sprites loaded successfully\n");
+    return (1);
 }
 
 int load_map(t_game *game, char *filename)
@@ -281,12 +358,11 @@ void draw_rectangle(t_game *game, int x, int y, int width, int height, int color
 void render_game(t_game *game)
 {
     int x, y;
-    int color;
 
     // Clear screen
     mlx_clear_window(game->mlx, game->window);
 
-    // Render map (42 cluster theme) - OPTIMIZED
+    // Render map with SPRITES! 🎨
     for (y = 0; y < game->map_height; y++)
     {
         for (x = 0; x < game->map_width; x++)
@@ -294,32 +370,35 @@ void render_game(t_game *game)
             int screen_x = x * TILE_SIZE;
             int screen_y = y * TILE_SIZE;
 
-            // 42 Cluster themed colors
+            // First draw floor everywhere
+            mlx_put_image_to_window(game->mlx, game->window, game->sprites.floor, screen_x, screen_y);
+
+            // Then draw specific tiles on top
             if (game->map[y][x] == '1')
-                color = 0x2F2F2F; // Dark gray for desks/walls
+            {
+                mlx_put_image_to_window(game->mlx, game->window, game->sprites.wall, screen_x, screen_y);
+            }
             else if (game->map[y][x] == 'C')
-                color = 0x00FF88; // Green for eval requirements
+            {
+                mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible, screen_x, screen_y);
+            }
             else if (game->map[y][x] == 'E')
             {
                 if (game->collected == game->collectibles)
-                    color = 0x00FFFF; // Cyan if exit is open
+                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.exit_open, screen_x, screen_y);
                 else
-                    color = 0xFF4444; // Red if exit is locked
+                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.exit_locked, screen_x, screen_y);
             }
-            else
-                color = 0x1A1A1A; // Very dark for cluster floor
-
-            // Draw tile as rectangle (MUCH FASTER)
-            draw_rectangle(game, screen_x, screen_y, TILE_SIZE, TILE_SIZE, color);
         }
     }
 
-    // Render player (42 peer) - STANDARD so_long style
+    // Render player with SPRITE! 🎮
     int px = game->player_x * TILE_SIZE;
     int py = game->player_y * TILE_SIZE;
+    mlx_put_image_to_window(game->mlx, game->window, game->sprites.player, px, py);
 
-    // Draw player as colored tile (standard so_long approach)
-    draw_rectangle(game, px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4, 0x4169E1); // Royal blue peer with border
+    // Add text overlay for player (as suggested)
+    mlx_string_put(game->mlx, game->window, px + 8, py + 20, 0xFFFFFF, "PEER");
 }
 
 int key_hook(int keycode, t_game *game)
