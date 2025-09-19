@@ -14,7 +14,9 @@ typedef struct s_sprites
     void    *floor;
     void    *wall;
     void    *player;
-    void    *collectible;
+    void    *collectible_valgrind;
+    void    *collectible_norminette;
+    void    *collectible_tests;
     void    *exit_locked;
     void    *exit_open;
     void    *enemy_norminette;
@@ -150,17 +152,25 @@ int load_sprites(t_game *game)
     game->sprites.player = mlx_xpm_file_to_image(game->mlx, "assets/player_peer_32.xpm", &w, &h);
     if (!game->sprites.player) { printf("❌ Failed to load player_peer_32.xpm\n"); return (0); }
 
-    printf("📂 Loading collectible...\n");
-    game->sprites.collectible = mlx_xpm_file_to_image(game->mlx, "assets/collectible_c_32.xpm", &w, &h);
-    if (!game->sprites.collectible) { printf("❌ Failed to load collectible_c_32.xpm\n"); return (0); }
+    printf("📂 Loading collectible_valgrind...\n");
+    game->sprites.collectible_valgrind = mlx_xpm_file_to_image(game->mlx, "assets/checkbox_valgrind_32.xpm", &w, &h);
+    if (!game->sprites.collectible_valgrind) { printf("❌ Failed to load checkbox_valgrind_32.xpm\n"); return (0); }
+
+    printf("📂 Loading collectible_norminette...\n");
+    game->sprites.collectible_norminette = mlx_xpm_file_to_image(game->mlx, "assets/checkbox_norminette_32.xpm", &w, &h);
+    if (!game->sprites.collectible_norminette) { printf("❌ Failed to load checkbox_norminette_32.xpm\n"); return (0); }
+
+    printf("📂 Loading collectible_tests...\n");
+    game->sprites.collectible_tests = mlx_xpm_file_to_image(game->mlx, "assets/checkbox_tests_32.xpm", &w, &h);
+    if (!game->sprites.collectible_tests) { printf("❌ Failed to load checkbox_tests_32.xpm\n"); return (0); }
 
     printf("📂 Loading exit_locked...\n");
-    game->sprites.exit_locked = mlx_xpm_file_to_image(game->mlx, "assets/exit_locked_32.xpm", &w, &h);
-    if (!game->sprites.exit_locked) { printf("❌ Failed to load exit_locked_32.xpm\n"); return (0); }
+    game->sprites.exit_locked = mlx_xpm_file_to_image(game->mlx, "assets/exit_code_review_32.xpm", &w, &h);
+    if (!game->sprites.exit_locked) { printf("❌ Failed to load exit_code_review_32.xpm\n"); return (0); }
 
     printf("📂 Loading exit_open...\n");
-    game->sprites.exit_open = mlx_xpm_file_to_image(game->mlx, "assets/exit_open_32.xpm", &w, &h);
-    if (!game->sprites.exit_open) { printf("❌ Failed to load exit_open_32.xpm\n"); return (0); }
+    game->sprites.exit_open = mlx_xpm_file_to_image(game->mlx, "assets/exit_merged_32.xpm", &w, &h);
+    if (!game->sprites.exit_open) { printf("❌ Failed to load exit_merged_32.xpm\n"); return (0); }
 
     printf("📂 Loading bonus_coin...\n");
     game->sprites.bonus_coin = mlx_xpm_file_to_image(game->mlx, "assets/bonus_coin_32.xpm", &w, &h);
@@ -380,7 +390,14 @@ void render_game(t_game *game)
             }
             else if (game->map[y][x] == 'C')
             {
-                mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible, screen_x, screen_y);
+                // Rotate collectible types based on position for variety
+                int collectible_type = (x + y) % 3;
+                if (collectible_type == 0)
+                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible_valgrind, screen_x, screen_y);
+                else if (collectible_type == 1)
+                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible_norminette, screen_x, screen_y);
+                else
+                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible_tests, screen_x, screen_y);
             }
             else if (game->map[y][x] == 'E')
             {
