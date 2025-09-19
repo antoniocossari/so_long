@@ -6,14 +6,15 @@
 #include <unistd.h>
 
 #define TILE_SIZE 32
-#define MAX_WIDTH 50
-#define MAX_HEIGHT 50
+#define MAX_WIDTH 100
+#define MAX_HEIGHT 100
 
 typedef struct s_sprites
 {
     void    *floor;
     void    *wall;
     void    *player;
+    void    *player_walk;
     void    *collectible_valgrind;
     void    *collectible_norminette;
     void    *collectible_tests;
@@ -54,6 +55,7 @@ typedef struct s_game
     t_enemy     enemies[9]; // 3 enemies per level, max 3 levels
     int         num_enemies;
     int         enemy_move_counter; // Count player moves to slow enemy movement
+    int         player_anim_frame; // 0 or 1 for player animation
     t_sprites   sprites;  // Sprite assets
 } t_game;
 
@@ -78,7 +80,7 @@ int main(int argc, char **argv)
 
     if (argc != 2)
     {
-        printf("Usage: %s eval1.ber\n", argv[0]);
+        printf("Usage: %s cluster_diagonali_small.ber\n", argv[0]);
         return (1);
     }
 
@@ -97,6 +99,7 @@ int main(int argc, char **argv)
     // Initialize game state
     game.num_enemies = 0;
     game.enemy_move_counter = 0;
+    game.player_anim_frame = 0;
     game.game_over = 0;
     game.game_over_reason = 0;
     int i;
@@ -181,8 +184,12 @@ int load_sprites(t_game *game)
     if (!game->sprites.wall) { printf("❌ Failed to load wall_desk_32.xpm\n"); return (0); }
 
     printf("📂 Loading player...\n");
-    game->sprites.player = mlx_xpm_file_to_image(game->mlx, "assets/player_peer_32.xpm", &w, &h);
-    if (!game->sprites.player) { printf("❌ Failed to load player_peer_32.xpm\n"); return (0); }
+    game->sprites.player = mlx_xpm_file_to_image(game->mlx, "assets/player_peer_idle_32.xpm", &w, &h);
+    if (!game->sprites.player) { printf("❌ Failed to load player_peer_idle_32.xpm\n"); return (0); }
+
+    printf("📂 Loading player_walk...\n");
+    game->sprites.player_walk = mlx_xpm_file_to_image(game->mlx, "assets/player_peer_walk_32.xpm", &w, &h);
+    if (!game->sprites.player_walk) { printf("❌ Failed to load player_peer_walk_32.xpm\n"); return (0); }
 
     printf("📂 Loading collectible_valgrind...\n");
     game->sprites.collectible_valgrind = mlx_xpm_file_to_image(game->mlx, "assets/checkbox_valgrind_32.xpm", &w, &h);
@@ -342,9 +349,9 @@ int next_eval(t_game *game)
 
     // Construct filename based on eval level
     if (game->current_eval == 2)
-        strcpy(filename, "eval2.ber");
+        strcpy(filename, "eval1.ber");
     else if (game->current_eval == 3)
-        strcpy(filename, "eval3.ber");
+        strcpy(filename, "eval2.ber");
     else
         return (0); // Invalid eval level
 
@@ -391,6 +398,7 @@ int next_eval(t_game *game)
     game->moves = 0; // Reset move counter for new eval
     game->collected = 0; // Reset collected counter for new eval
     game->enemy_move_counter = 0; // Reset enemy movement counter
+    game->player_anim_frame = 0; // Reset animation frame
 
     printf("✅ Eval %d loaded successfully!\n", game->current_eval);
     printf("📚 New requirements: %d collectibles\n", game->collectibles);
@@ -456,10 +464,15 @@ void render_game(t_game *game)
         }
     }
 
-    // Render player with SPRITE! 🎮
+    // Render player with ANIMATED SPRITE! 🎮
     int px = game->player_x * TILE_SIZE;
     int py = game->player_y * TILE_SIZE;
-    mlx_put_image_to_window(game->mlx, game->window, game->sprites.player, px, py);
+
+    // Use animated frame
+    if (game->player_anim_frame == 0)
+        mlx_put_image_to_window(game->mlx, game->window, game->sprites.player, px, py);
+    else
+        mlx_put_image_to_window(game->mlx, game->window, game->sprites.player_walk, px, py);
 
     // Add text overlay for player (as suggested)
     mlx_string_put(game->mlx, game->window, px + 8, py + 20, 0xFFFFFF, "PEER");
@@ -488,7 +501,7 @@ int key_hook(int keycode, t_game *game)
         else if (keycode == 15) // R - Restart
         {
             printf("🔄 Restarting game...\n");
-            if (restart_game(game, "eval1.ber"))
+            if (restart_game(game, "cluster_diagonali_small.ber"))
             {
                 game->game_over = 0;
                 render_game(game);
@@ -538,7 +551,11 @@ int key_hook(int keycode, t_game *game)
 
     // Move player if position changed
     if (new_x != game->player_x || new_y != game->player_y)
+    {
+        // Toggle animation frame on movement
+        game->player_anim_frame = (game->player_anim_frame + 1) % 2;
         move_player(game, new_x, new_y);
+    }
 
     return (0);
 }
@@ -616,10 +633,21 @@ void move_player(t_game *game, int new_x, int new_y)
     {
         game->map[new_y][new_x] = '0'; // Remove collectible
         game->collected++;
-        game->score += 10; // +10 points per eval requirement
 
-        printf("✅ Eval requirement completed! (%d/%d) +10 points\n",
-               game->collected, game->collectibles);
+        // Dynamic scoring: ensure exactly 100 points per level
+        int points_to_add;
+        if (game->collected == game->collectibles) {
+            // Last collectible: award remaining points to reach exactly 100
+            int current_level_target = (game->current_eval * 100);
+            points_to_add = current_level_target - game->score;
+        } else {
+            // Regular collectible: award base points
+            points_to_add = 100 / game->collectibles;
+        }
+        game->score += points_to_add;
+
+        printf("✅ Eval requirement completed! (%d/%d) +%d points\n",
+               game->collected, game->collectibles, points_to_add);
 
         if (game->collected == game->collectibles)
             printf("🚪 All requirements met! Exit is now open!\n");
@@ -909,6 +937,7 @@ int restart_game(t_game *game, char *filename)
     game->game_over_reason = 0;
     game->num_enemies = 0;
     game->enemy_move_counter = 0;
+    game->player_anim_frame = 0;
 
     // Clear enemies
     int i;
