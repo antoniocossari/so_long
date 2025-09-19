@@ -21,9 +21,18 @@ typedef struct s_sprites
     void    *exit_open;
     void    *enemy_norminette;
     void    *enemy_segfault;
+    void    *enemy_memory_leak;
     void    *enemy_peer;
     void    *bonus_coin;
 } t_sprites;
+
+typedef struct s_enemy
+{
+    int x;
+    int y;
+    int type; // 0=norminette, 1=segfault, 2=memory_leak
+    int active;
+} t_enemy;
 
 typedef struct s_game
 {
@@ -40,6 +49,9 @@ typedef struct s_game
     int         score;
     int         current_eval;
     int         victory;
+    t_enemy     enemies[9]; // 3 enemies per level, max 3 levels
+    int         num_enemies;
+    int         enemy_move_counter; // Count player moves to slow enemy movement
     t_sprites   sprites;  // Sprite assets
 } t_game;
 
@@ -51,6 +63,9 @@ void    render_game(t_game *game);
 int     key_hook(int keycode, t_game *game);
 int     close_game(t_game *game);
 void    move_player(t_game *game, int new_x, int new_y);
+void    spawn_enemies(t_game *game);
+void    move_enemies(t_game *game);
+void    render_enemies(t_game *game);
 
 int main(int argc, char **argv)
 {
@@ -73,6 +88,13 @@ int main(int argc, char **argv)
     }
 
     printf("✅ MLX initialized\n");
+
+    // Initialize enemies array
+    game.num_enemies = 0;
+    game.enemy_move_counter = 0;
+    int i;
+    for (i = 0; i < 9; i++)
+        game.enemies[i].active = 0;
 
     // Load sprites first
     if (!load_sprites(&game))
@@ -117,6 +139,9 @@ int main(int argc, char **argv)
     printf("📚 Eval Requirements (C): %d\n", game.collectibles);
     printf("🎯 Goal: Pass all 3 Evals to escape the cluster!\n");
     printf("🎮 Controls: WASD | Progress: Eval1 → Eval2 → Eval3 → Victory!\n\n");
+
+    // Initialize enemies
+    spawn_enemies(&game);
 
     // Set hooks
     mlx_key_hook(game.window, key_hook, &game);
@@ -176,14 +201,18 @@ int load_sprites(t_game *game)
     game->sprites.bonus_coin = mlx_xpm_file_to_image(game->mlx, "assets/bonus_coin_32.xpm", &w, &h);
     if (!game->sprites.bonus_coin) { printf("❌ Failed to load bonus_coin_32.xpm\n"); return (0); }
 
-    // Load 64x64 enemies
+    // Load 32x32 enemy checkboxes (red)
     printf("📂 Loading enemy_norminette...\n");
-    game->sprites.enemy_norminette = mlx_xpm_file_to_image(game->mlx, "assets/enemy_norminette_64.xpm", &w, &h);
-    if (!game->sprites.enemy_norminette) { printf("❌ Failed to load enemy_norminette_64.xpm\n"); return (0); }
+    game->sprites.enemy_norminette = mlx_xpm_file_to_image(game->mlx, "assets/enemy_norminette_32.xpm", &w, &h);
+    if (!game->sprites.enemy_norminette) { printf("❌ Failed to load enemy_norminette_32.xpm\n"); return (0); }
 
     printf("📂 Loading enemy_segfault...\n");
-    game->sprites.enemy_segfault = mlx_xpm_file_to_image(game->mlx, "assets/enemy_segfault_64.xpm", &w, &h);
-    if (!game->sprites.enemy_segfault) { printf("❌ Failed to load enemy_segfault_64.xpm\n"); return (0); }
+    game->sprites.enemy_segfault = mlx_xpm_file_to_image(game->mlx, "assets/enemy_segfault_32.xpm", &w, &h);
+    if (!game->sprites.enemy_segfault) { printf("❌ Failed to load enemy_segfault_32.xpm\n"); return (0); }
+
+    printf("📂 Loading enemy_memory_leak...\n");
+    game->sprites.enemy_memory_leak = mlx_xpm_file_to_image(game->mlx, "assets/enemy_memory_leak_32.xpm", &w, &h);
+    if (!game->sprites.enemy_memory_leak) { printf("❌ Failed to load enemy_memory_leak_32.xpm\n"); return (0); }
 
     printf("📂 Loading enemy_peer...\n");
     game->sprites.enemy_peer = mlx_xpm_file_to_image(game->mlx, "assets/enemy_peer_64.xpm", &w, &h);
@@ -347,10 +376,14 @@ int next_eval(t_game *game)
 
     // Reset position and stats for new eval
     game->moves = 0; // Reset move counter for new eval
+    game->enemy_move_counter = 0; // Reset enemy movement counter
 
     printf("✅ Eval %d loaded successfully!\n", game->current_eval);
     printf("📚 New requirements: %d collectibles\n", game->collectibles);
     printf("👤 Player position: (%d,%d)\n", game->player_x, game->player_y);
+
+    // Spawn new enemies for this level
+    spawn_enemies(game);
 
     // Re-render with new map
     render_game(game);
@@ -416,6 +449,9 @@ void render_game(t_game *game)
 
     // Add text overlay for player (as suggested)
     mlx_string_put(game->mlx, game->window, px + 8, py + 20, 0xFFFFFF, "PEER");
+
+    // Render enemies
+    render_enemies(game);
 }
 
 int key_hook(int keycode, t_game *game)
@@ -539,6 +575,37 @@ void move_player(t_game *game, int new_x, int new_y)
             printf("🚪 All requirements met! Exit is now open!\n");
     }
 
+    // Move enemies only every 3 player moves for balanced gameplay
+    game->enemy_move_counter++;
+    if (game->enemy_move_counter >= 3)
+    {
+        move_enemies(game);
+        game->enemy_move_counter = 0;
+    }
+
+    // Check for enemy collisions
+    int i;
+    for (i = 0; i < game->num_enemies; i++)
+    {
+        if (game->enemies[i].active &&
+            game->enemies[i].x == game->player_x &&
+            game->enemies[i].y == game->player_y)
+        {
+            // Enemy collision detected!
+            printf("💀 GAME OVER! Hit by ");
+            if (game->enemies[i].type == 0)
+                printf("NORMINETTE error!\n");
+            else if (game->enemies[i].type == 1)
+                printf("SEGFAULT!\n");
+            else if (game->enemies[i].type == 2)
+                printf("MEMORY LEAK!\n");
+
+            printf("🎯 Final score: %d points\n", game->score);
+            close_game(game);
+            return;
+        }
+    }
+
     // Re-render ONLY when needed
     render_game(game);
 }
@@ -554,4 +621,120 @@ int close_game(t_game *game)
 
     exit(0);
     return (0);
+}
+
+void spawn_enemies(t_game *game)
+{
+    int i;
+    int spawn_count = 3; // 3 enemies per level
+
+    // Clear existing enemies
+    for (i = 0; i < 9; i++)
+        game->enemies[i].active = 0;
+
+    game->num_enemies = spawn_count;
+
+    // Spawn 3 enemies: norminette, segfault, memory_leak
+    for (i = 0; i < spawn_count; i++)
+    {
+        // Find empty spaces to spawn enemies
+        int spawn_x, spawn_y;
+        int attempts = 0;
+
+        do {
+            spawn_x = 1 + (rand() % (game->map_width - 2));
+            spawn_y = 1 + (rand() % (game->map_height - 2));
+            attempts++;
+        } while ((game->map[spawn_y][spawn_x] != '0' ||
+                 (spawn_x == game->player_x && spawn_y == game->player_y)) &&
+                 attempts < 100);
+
+        if (attempts < 100)
+        {
+            game->enemies[i].x = spawn_x;
+            game->enemies[i].y = spawn_y;
+            game->enemies[i].type = i % 3; // 0=norminette, 1=segfault, 2=memory_leak
+            game->enemies[i].active = 1;
+        }
+    }
+}
+
+void move_enemies(t_game *game)
+{
+    int i;
+
+    for (i = 0; i < game->num_enemies; i++)
+    {
+        if (!game->enemies[i].active)
+            continue;
+
+        // Simple chase AI: move towards player
+        int dx = 0, dy = 0;
+
+        if (game->enemies[i].x < game->player_x)
+            dx = 1;
+        else if (game->enemies[i].x > game->player_x)
+            dx = -1;
+
+        if (game->enemies[i].y < game->player_y)
+            dy = 1;
+        else if (game->enemies[i].y > game->player_y)
+            dy = -1;
+
+        // Try to move in preferred direction
+        int new_x = game->enemies[i].x + dx;
+        int new_y = game->enemies[i].y + dy;
+
+        // Check if new position is valid (not wall, in bounds, and no other enemy there)
+        int enemy_collision = 0;
+        int j;
+        for (j = 0; j < game->num_enemies; j++)
+        {
+            if (j != i && game->enemies[j].active &&
+                game->enemies[j].x == new_x && game->enemies[j].y == new_y)
+            {
+                enemy_collision = 1;
+                break;
+            }
+        }
+
+        if (new_x >= 0 && new_x < game->map_width &&
+            new_y >= 0 && new_y < game->map_height &&
+            game->map[new_y][new_x] != '1' && !enemy_collision)
+        {
+            game->enemies[i].x = new_x;
+            game->enemies[i].y = new_y;
+        }
+    }
+}
+
+void render_enemies(t_game *game)
+{
+    int i;
+
+    for (i = 0; i < game->num_enemies; i++)
+    {
+        if (!game->enemies[i].active)
+            continue;
+
+        int screen_x = game->enemies[i].x * 32;
+        int screen_y = game->enemies[i].y * 32;
+
+        // Render based on enemy type
+        if (game->enemies[i].type == 0) // norminette
+        {
+            mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_norminette, screen_x, screen_y);
+            mlx_string_put(game->mlx, game->window, screen_x + 2, screen_y + 20, 0xFF0000, "NORM");
+        }
+        else if (game->enemies[i].type == 1) // segfault
+        {
+            mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_segfault, screen_x, screen_y);
+            mlx_string_put(game->mlx, game->window, screen_x + 2, screen_y + 20, 0xFF0000, "SEGV");
+        }
+        else if (game->enemies[i].type == 2) // memory_leak
+        {
+            mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_memory_leak, screen_x, screen_y);
+            mlx_string_put(game->mlx, game->window, screen_x + 1, screen_y + 20, 0xFF0000, "LEAK");
+        }
+    }
 }
