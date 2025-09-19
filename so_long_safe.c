@@ -49,6 +49,8 @@ typedef struct s_game
     int         score;
     int         current_eval;
     int         victory;
+    int         game_over;
+    int         game_over_reason; // 0=enemy collision, 1=completed
     t_enemy     enemies[9]; // 3 enemies per level, max 3 levels
     int         num_enemies;
     int         enemy_move_counter; // Count player moves to slow enemy movement
@@ -66,6 +68,9 @@ void    move_player(t_game *game, int new_x, int new_y);
 void    spawn_enemies(t_game *game);
 void    move_enemies(t_game *game);
 void    render_enemies(t_game *game);
+void    render_ui(t_game *game);
+void    render_game_over_menu(t_game *game);
+int     restart_game(t_game *game, char *filename);
 
 int main(int argc, char **argv)
 {
@@ -89,9 +94,11 @@ int main(int argc, char **argv)
 
     printf("✅ MLX initialized\n");
 
-    // Initialize enemies array
+    // Initialize game state
     game.num_enemies = 0;
     game.enemy_move_counter = 0;
+    game.game_over = 0;
+    game.game_over_reason = 0;
     int i;
     for (i = 0; i < 9; i++)
         game.enemies[i].active = 0;
@@ -314,6 +321,12 @@ int load_map(t_game *game, char *filename)
         }
     }
 
+    // Process last line if file doesn't end with newline
+    if (char_idx > 0)
+    {
+        game->map[line_idx][char_idx] = '\0';
+    }
+
     printf("✅ Map parsing complete\n");
     printf("📚 Collectibles found: %d\n", game->collectibles);
 
@@ -376,6 +389,7 @@ int next_eval(t_game *game)
 
     // Reset position and stats for new eval
     game->moves = 0; // Reset move counter for new eval
+    game->collected = 0; // Reset collected counter for new eval
     game->enemy_move_counter = 0; // Reset enemy movement counter
 
     printf("✅ Eval %d loaded successfully!\n", game->current_eval);
@@ -452,10 +466,44 @@ void render_game(t_game *game)
 
     // Render enemies
     render_enemies(game);
+
+    // Render UI overlay
+    if (game->game_over)
+        render_game_over_menu(game);
+    else
+        render_ui(game);
 }
 
 int key_hook(int keycode, t_game *game)
 {
+    // Handle game over menu
+    if (game->game_over)
+    {
+        if (keycode == 53) // ESC
+        {
+            printf("🚪 ESC pressed - exiting\n");
+            close_game(game);
+            return (0);
+        }
+        else if (keycode == 15) // R - Restart
+        {
+            printf("🔄 Restarting game...\n");
+            if (restart_game(game, "eval1.ber"))
+            {
+                game->game_over = 0;
+                render_game(game);
+            }
+            return (0);
+        }
+        else if (keycode == 12) // Q - Quit
+        {
+            printf("👋 Quitting game...\n");
+            close_game(game);
+            return (0);
+        }
+        return (0); // Ignore other keys during game over
+    }
+
     int new_x = game->player_x;
     int new_y = game->player_y;
 
@@ -541,7 +589,9 @@ void move_player(t_game *game, int new_x, int new_y)
                 printf("\n🏆 ALL 3 EVALS COMPLETED! ESCAPED FROM THE CLUSTER! 🏆\n");
                 printf("🎯 Final Score: %d/125 points\n", game->score);
                 game->victory = 1;
-                close_game(game);
+                game->game_over = 1;
+                game->game_over_reason = 1; // Victory
+                render_game(game);
                 return;
             }
         }
@@ -601,7 +651,9 @@ void move_player(t_game *game, int new_x, int new_y)
                 printf("MEMORY LEAK!\n");
 
             printf("🎯 Final score: %d points\n", game->score);
-            close_game(game);
+            game->game_over = 1;
+            game->game_over_reason = 0; // Enemy collision
+            render_game(game);
             return;
         }
     }
@@ -737,4 +789,158 @@ void render_enemies(t_game *game)
             mlx_string_put(game->mlx, game->window, screen_x + 1, screen_y + 20, 0xFF0000, "LEAK");
         }
     }
+}
+
+void render_ui(t_game *game)
+{
+    char text[50];
+
+    // Background color for better readability
+    int ui_color = 0xFFFFFF; // White text
+    int shadow_color = 0x000000; // Black shadow
+
+    // Top-left corner UI
+    int ui_x = 10;
+    int ui_y = 10;
+    int line_height = 15;
+
+    // Eval progress
+    sprintf(text, "EVAL %d/3", game->current_eval);
+    mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
+    mlx_string_put(game->mlx, game->window, ui_x, ui_y, ui_color, text);
+    ui_y += line_height;
+
+    // Score
+    sprintf(text, "SCORE: %d", game->score);
+    mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
+    mlx_string_put(game->mlx, game->window, ui_x, ui_y, ui_color, text);
+    ui_y += line_height;
+
+    // Collectibles progress
+    sprintf(text, "TASKS: %d/%d", game->collected, game->collectibles);
+    mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
+    mlx_string_put(game->mlx, game->window, ui_x, ui_y, ui_color, text);
+    ui_y += line_height;
+
+    // Move counter
+    sprintf(text, "MOVES: %d", game->moves);
+    mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
+    mlx_string_put(game->mlx, game->window, ui_x, ui_y, ui_color, text);
+    ui_y += line_height;
+
+    // Status
+    if (game->collected == game->collectibles)
+    {
+        sprintf(text, "EXIT OPEN!");
+        mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
+        mlx_string_put(game->mlx, game->window, ui_x, ui_y, 0x00FF00, text); // Green
+    }
+    else
+    {
+        sprintf(text, "FIND TASKS");
+        mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
+        mlx_string_put(game->mlx, game->window, ui_x, ui_y, 0xFFFF00, text); // Yellow
+    }
+}
+
+void render_game_over_menu(t_game *game)
+{
+    // Don't clear screen - overlay on existing game
+
+    char text[100];
+    int center_x = (game->map_width * TILE_SIZE) / 2;
+    int center_y = (game->map_height * TILE_SIZE) / 2;
+
+    // Background box for menu
+    for (int i = -80; i < 80; i++)
+    {
+        for (int j = -60; j < 60; j++)
+        {
+            if (center_x + i >= 0 && center_x + i < game->map_width * TILE_SIZE &&
+                center_y + j >= 0 && center_y + j < game->map_height * TILE_SIZE)
+            {
+                mlx_pixel_put(game->mlx, game->window, center_x + i, center_y + j, 0x000000);
+            }
+        }
+    }
+
+    int menu_x = center_x - 70;
+    int menu_y = center_y - 50;
+    int line_height = 20;
+
+    // Title
+    if (game->game_over_reason == 1) // Victory
+    {
+        sprintf(text, "🏆 VICTORY! 🏆");
+        mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0x00FF00, text);
+        menu_y += line_height;
+        sprintf(text, "Score: %d points", game->score);
+        mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFFFFFF, text);
+    }
+    else // Game Over
+    {
+        sprintf(text, "💀 GAME OVER 💀");
+        mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFF0000, text);
+        menu_y += line_height;
+        sprintf(text, "Score: %d points", game->score);
+        mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFFFFFF, text);
+    }
+
+    menu_y += line_height * 2;
+
+    // Menu options
+    sprintf(text, "R - Restart");
+    mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFFFFFF, text);
+    menu_y += line_height;
+
+    sprintf(text, "ESC/Q - Quit");
+    mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFFFFFF, text);
+}
+
+int restart_game(t_game *game, char *filename)
+{
+    // Reset game state
+    game->current_eval = 1;
+    game->collected = 0;
+    game->moves = 0;
+    game->score = 0;
+    game->victory = 0;
+    game->game_over = 0;
+    game->game_over_reason = 0;
+    game->num_enemies = 0;
+    game->enemy_move_counter = 0;
+
+    // Clear enemies
+    int i;
+    for (i = 0; i < 9; i++)
+        game->enemies[i].active = 0;
+
+    // Reload map
+    if (!load_map(game, filename))
+    {
+        printf("❌ Failed to restart: Could not load map\n");
+        return (0);
+    }
+
+    // Recreate window with correct dimensions for eval1
+    if (game->window)
+        mlx_destroy_window(game->mlx, game->window);
+
+    game->window = mlx_new_window(game->mlx, game->map_width * TILE_SIZE,
+                                  game->map_height * TILE_SIZE, "Escape from the Cluster");
+    if (!game->window)
+    {
+        printf("❌ Failed to recreate window on restart\n");
+        return (0);
+    }
+
+    // Reset hooks for new window
+    mlx_key_hook(game->window, key_hook, game);
+    mlx_hook(game->window, 17, 0, close_game, game);
+
+    // Respawn enemies
+    spawn_enemies(game);
+
+    printf("🔄 Game restarted successfully!\n");
+    return (1);
 }
