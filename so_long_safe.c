@@ -217,16 +217,16 @@ int load_sprites(t_game *game)
 
     // Load 32x32 enemy checkboxes (red)
     printf("📂 Loading enemy_norminette...\n");
-    game->sprites.enemy_norminette = mlx_xpm_file_to_image(game->mlx, "assets/enemy_norminette_32.xpm", &w, &h);
-    if (!game->sprites.enemy_norminette) { printf("❌ Failed to load enemy_norminette_32.xpm\n"); return (0); }
+    game->sprites.enemy_norminette = mlx_xpm_file_to_image(game->mlx, "assets/enemy_x_32.xpm", &w, &h);
+    if (!game->sprites.enemy_norminette) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
 
     printf("📂 Loading enemy_segfault...\n");
-    game->sprites.enemy_segfault = mlx_xpm_file_to_image(game->mlx, "assets/enemy_segfault_32.xpm", &w, &h);
-    if (!game->sprites.enemy_segfault) { printf("❌ Failed to load enemy_segfault_32.xpm\n"); return (0); }
+    game->sprites.enemy_segfault = mlx_xpm_file_to_image(game->mlx, "assets/enemy_x_32.xpm", &w, &h);
+    if (!game->sprites.enemy_segfault) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
 
     printf("📂 Loading enemy_memory_leak...\n");
-    game->sprites.enemy_memory_leak = mlx_xpm_file_to_image(game->mlx, "assets/enemy_memory_leak_32.xpm", &w, &h);
-    if (!game->sprites.enemy_memory_leak) { printf("❌ Failed to load enemy_memory_leak_32.xpm\n"); return (0); }
+    game->sprites.enemy_memory_leak = mlx_xpm_file_to_image(game->mlx, "assets/enemy_x_32.xpm", &w, &h);
+    if (!game->sprites.enemy_memory_leak) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
 
     printf("📂 Loading enemy_peer...\n");
     game->sprites.enemy_peer = mlx_xpm_file_to_image(game->mlx, "assets/enemy_peer_64.xpm", &w, &h);
@@ -475,7 +475,7 @@ void render_game(t_game *game)
         mlx_put_image_to_window(game->mlx, game->window, game->sprites.player_walk, px, py);
 
     // Add text overlay for player (as suggested)
-    mlx_string_put(game->mlx, game->window, px + 8, py + 20, 0xFFFFFF, "PEER");
+    mlx_string_put(game->mlx, game->window, px + 8, py - 10, 0xFFFFFF, "PEER");
 
     // Render enemies
     render_enemies(game);
@@ -804,17 +804,17 @@ void render_enemies(t_game *game)
         if (game->enemies[i].type == 0) // norminette
         {
             mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_norminette, screen_x, screen_y);
-            mlx_string_put(game->mlx, game->window, screen_x + 2, screen_y + 20, 0xFF0000, "NORM");
+            mlx_string_put(game->mlx, game->window, screen_x + 2, screen_y - 10, 0xFF0000, "NORM");
         }
         else if (game->enemies[i].type == 1) // segfault
         {
             mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_segfault, screen_x, screen_y);
-            mlx_string_put(game->mlx, game->window, screen_x + 2, screen_y + 20, 0xFF0000, "SEGV");
+            mlx_string_put(game->mlx, game->window, screen_x + 2, screen_y - 10, 0xFF0000, "SEGV");
         }
         else if (game->enemies[i].type == 2) // memory_leak
         {
             mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_memory_leak, screen_x, screen_y);
-            mlx_string_put(game->mlx, game->window, screen_x + 1, screen_y + 20, 0xFF0000, "LEAK");
+            mlx_string_put(game->mlx, game->window, screen_x + 1, screen_y - 10, 0xFF0000, "LEAK");
         }
     }
 }
