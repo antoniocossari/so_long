@@ -18,13 +18,11 @@ typedef struct s_sprites
     void    *collectible_valgrind;
     void    *collectible_norminette;
     void    *collectible_tests;
-    void    *exit_locked;
+    void    *exit_closed;
     void    *exit_open;
     void    *enemy_norminette;
     void    *enemy_segfault;
     void    *enemy_memory_leak;
-    void    *enemy_peer;
-    void    *bonus_coin;
 } t_sprites;
 
 typedef struct s_enemy
@@ -56,6 +54,9 @@ typedef struct s_game
     int         num_enemies;
     int         enemy_move_counter; // Count player moves to slow enemy movement
     int         player_anim_frame; // 0 or 1 for player animation
+    int         collect_anim_x; // X position of collection animation
+    int         collect_anim_y; // Y position of collection animation
+    int         collect_anim_timer; // Animation timer (0 = no animation)
     t_sprites   sprites;  // Sprite assets
 } t_game;
 
@@ -100,6 +101,7 @@ int main(int argc, char **argv)
     game.num_enemies = 0;
     game.enemy_move_counter = 0;
     game.player_anim_frame = 0;
+    game.collect_anim_timer = 0;
     game.game_over = 0;
     game.game_over_reason = 0;
     int i;
@@ -180,8 +182,8 @@ int load_sprites(t_game *game)
     if (!game->sprites.floor) { printf("❌ Failed to load floor_32.xpm\n"); return (0); }
 
     printf("📂 Loading wall...\n");
-    game->sprites.wall = mlx_xpm_file_to_image(game->mlx, "assets/wall_desk_32.xpm", &w, &h);
-    if (!game->sprites.wall) { printf("❌ Failed to load wall_desk_32.xpm\n"); return (0); }
+    game->sprites.wall = mlx_xpm_file_to_image(game->mlx, "assets/wall_32.xpm", &w, &h);
+    if (!game->sprites.wall) { printf("❌ Failed to load wall_32.xpm\n"); return (0); }
 
     printf("📂 Loading player...\n");
     game->sprites.player = mlx_xpm_file_to_image(game->mlx, "assets/player_peer_idle_32.xpm", &w, &h);
@@ -192,45 +194,38 @@ int load_sprites(t_game *game)
     if (!game->sprites.player_walk) { printf("❌ Failed to load player_peer_walk_32.xpm\n"); return (0); }
 
     printf("📂 Loading collectible_valgrind...\n");
-    game->sprites.collectible_valgrind = mlx_xpm_file_to_image(game->mlx, "assets/checkbox_valgrind_32.xpm", &w, &h);
-    if (!game->sprites.collectible_valgrind) { printf("❌ Failed to load checkbox_valgrind_32.xpm\n"); return (0); }
+    game->sprites.collectible_valgrind = mlx_xpm_file_to_image(game->mlx, "assets/collectible_32.xpm", &w, &h);
+    if (!game->sprites.collectible_valgrind) { printf("❌ Failed to load collectible_32.xpm for valgrind\n"); return (0); }
 
     printf("📂 Loading collectible_norminette...\n");
-    game->sprites.collectible_norminette = mlx_xpm_file_to_image(game->mlx, "assets/checkbox_norminette_32.xpm", &w, &h);
-    if (!game->sprites.collectible_norminette) { printf("❌ Failed to load checkbox_norminette_32.xpm\n"); return (0); }
+    game->sprites.collectible_norminette = mlx_xpm_file_to_image(game->mlx, "assets/collectible_32.xpm", &w, &h);
+    if (!game->sprites.collectible_norminette) { printf("❌ Failed to load collectible_32.xpm\n"); return (0); }
 
     printf("📂 Loading collectible_tests...\n");
-    game->sprites.collectible_tests = mlx_xpm_file_to_image(game->mlx, "assets/checkbox_tests_32.xpm", &w, &h);
-    if (!game->sprites.collectible_tests) { printf("❌ Failed to load checkbox_tests_32.xpm\n"); return (0); }
+    game->sprites.collectible_tests = mlx_xpm_file_to_image(game->mlx, "assets/collectible_32.xpm", &w, &h);
+    if (!game->sprites.collectible_tests) { printf("❌ Failed to load collectible_32.xpm\n"); return (0); }
 
-    printf("📂 Loading exit_locked...\n");
-    game->sprites.exit_locked = mlx_xpm_file_to_image(game->mlx, "assets/exit_code_review_32.xpm", &w, &h);
-    if (!game->sprites.exit_locked) { printf("❌ Failed to load exit_code_review_32.xpm\n"); return (0); }
+    printf("📂 Loading exit_closed...\n");
+    game->sprites.exit_closed = mlx_xpm_file_to_image(game->mlx, "assets/exit_32.xpm", &w, &h);
+    if (!game->sprites.exit_closed) { printf("❌ Failed to load exit_32.xpm\n"); return (0); }
 
     printf("📂 Loading exit_open...\n");
-    game->sprites.exit_open = mlx_xpm_file_to_image(game->mlx, "assets/exit_merged_32.xpm", &w, &h);
-    if (!game->sprites.exit_open) { printf("❌ Failed to load exit_merged_32.xpm\n"); return (0); }
-
-    printf("📂 Loading bonus_coin...\n");
-    game->sprites.bonus_coin = mlx_xpm_file_to_image(game->mlx, "assets/bonus_coin_32.xpm", &w, &h);
-    if (!game->sprites.bonus_coin) { printf("❌ Failed to load bonus_coin_32.xpm\n"); return (0); }
+    game->sprites.exit_open = mlx_xpm_file_to_image(game->mlx, "assets/exit_open_32.xpm", &w, &h);
+    if (!game->sprites.exit_open) { printf("❌ Failed to load exit_open_32.xpm\n"); return (0); }
 
     // Load 32x32 enemy checkboxes (red)
     printf("📂 Loading enemy_norminette...\n");
-    game->sprites.enemy_norminette = mlx_xpm_file_to_image(game->mlx, "assets/enemy_x_32.xpm", &w, &h);
+    game->sprites.enemy_norminette = mlx_xpm_file_to_image(game->mlx, "assets/enemy_32.xpm", &w, &h);
     if (!game->sprites.enemy_norminette) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
 
     printf("📂 Loading enemy_segfault...\n");
-    game->sprites.enemy_segfault = mlx_xpm_file_to_image(game->mlx, "assets/enemy_x_32.xpm", &w, &h);
+    game->sprites.enemy_segfault = mlx_xpm_file_to_image(game->mlx, "assets/enemy_32.xpm", &w, &h);
     if (!game->sprites.enemy_segfault) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
 
     printf("📂 Loading enemy_memory_leak...\n");
-    game->sprites.enemy_memory_leak = mlx_xpm_file_to_image(game->mlx, "assets/enemy_x_32.xpm", &w, &h);
+    game->sprites.enemy_memory_leak = mlx_xpm_file_to_image(game->mlx, "assets/enemy_32.xpm", &w, &h);
     if (!game->sprites.enemy_memory_leak) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
 
-    printf("📂 Loading enemy_peer...\n");
-    game->sprites.enemy_peer = mlx_xpm_file_to_image(game->mlx, "assets/enemy_peer_64.xpm", &w, &h);
-    if (!game->sprites.enemy_peer) { printf("❌ Failed to load enemy_peer_64.xpm\n"); return (0); }
 
     printf("✅ All sprites loaded successfully\n");
     return (1);
@@ -399,6 +394,7 @@ int next_eval(t_game *game)
     game->collected = 0; // Reset collected counter for new eval
     game->enemy_move_counter = 0; // Reset enemy movement counter
     game->player_anim_frame = 0; // Reset animation frame
+    game->collect_anim_timer = 0; // Reset collection animation
 
     printf("✅ Eval %d loaded successfully!\n", game->current_eval);
     printf("📚 New requirements: %d collectibles\n", game->collectibles);
@@ -457,9 +453,15 @@ void render_game(t_game *game)
             else if (game->map[y][x] == 'E')
             {
                 if (game->collected == game->collectibles)
+                {
                     mlx_put_image_to_window(game->mlx, game->window, game->sprites.exit_open, screen_x, screen_y);
+                    mlx_string_put(game->mlx, game->window, screen_x + 8, screen_y - 10, 0x00FF00, "EXIT");
+                }
                 else
-                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.exit_locked, screen_x, screen_y);
+                {
+                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.exit_closed, screen_x, screen_y);
+                    mlx_string_put(game->mlx, game->window, screen_x + 8, screen_y - 10, 0xFFD700, "EXIT");
+                }
             }
         }
     }
@@ -479,6 +481,38 @@ void render_game(t_game *game)
 
     // Render enemies
     render_enemies(game);
+
+    // Render collection animation if active
+    if (game->collect_anim_timer > 0)
+    {
+        int anim_x = game->collect_anim_x * TILE_SIZE;
+        int anim_y = game->collect_anim_y * TILE_SIZE;
+
+        // Create expanding yellow circle effect
+        int radius = (11 - game->collect_anim_timer) * 3; // Expands as timer decreases
+        int color = 0xFFD700; // Gold color
+
+        // Draw simple expanding circle
+        for (int i = -radius; i <= radius; i++)
+        {
+            for (int j = -radius; j <= radius; j++)
+            {
+                if (i*i + j*j <= radius*radius)
+                {
+                    int px = anim_x + 16 + i; // Center on tile
+                    int py = anim_y + 16 + j;
+                    if (px >= 0 && px < game->map_width * TILE_SIZE &&
+                        py >= 0 && py < game->map_height * TILE_SIZE)
+                    {
+                        mlx_pixel_put(game->mlx, game->window, px, py, color);
+                    }
+                }
+            }
+        }
+
+        // Decrease timer
+        game->collect_anim_timer--;
+    }
 
     // Render UI overlay
     if (game->game_over)
@@ -501,7 +535,7 @@ int key_hook(int keycode, t_game *game)
         else if (keycode == 114) // R - Restart
         {
             printf("🔄 Restarting game...\n");
-            if (restart_game(game, "cluster_diagonali_small.ber"))
+            if (restart_game(game, "eval1.ber"))
             {
                 game->game_over = 0;
                 render_game(game);
@@ -634,6 +668,11 @@ void move_player(t_game *game, int new_x, int new_y)
         game->map[new_y][new_x] = '0'; // Remove collectible
         game->collected++;
 
+        // Start collection animation
+        game->collect_anim_x = new_x;
+        game->collect_anim_y = new_y;
+        game->collect_anim_timer = 10; // Animation lasts 10 frames
+
         // Dynamic scoring: ensure exactly 100 points per level
         int points_to_add;
         if (game->collected == game->collectibles) {
@@ -708,6 +747,8 @@ void spawn_enemies(t_game *game)
     int i;
     int spawn_count = 3; // 3 enemies per level
 
+    printf("🔄 Spawning %d enemies...\n", spawn_count);
+
     // Clear existing enemies
     for (i = 0; i < 9; i++)
         game->enemies[i].active = 0;
@@ -735,8 +776,14 @@ void spawn_enemies(t_game *game)
             game->enemies[i].y = spawn_y;
             game->enemies[i].type = i % 3; // 0=norminette, 1=segfault, 2=memory_leak
             game->enemies[i].active = 1;
+            printf("👹 Enemy %d spawned at (%d,%d) type %d\n", i, spawn_x, spawn_y, game->enemies[i].type);
+        }
+        else
+        {
+            printf("❌ Failed to spawn enemy %d after %d attempts\n", i, attempts);
         }
     }
+    printf("✅ Enemy spawning complete. Active enemies: %d\n", game->num_enemies);
 }
 
 void move_enemies(t_game *game)
@@ -938,6 +985,7 @@ int restart_game(t_game *game, char *filename)
     game->num_enemies = 0;
     game->enemy_move_counter = 0;
     game->player_anim_frame = 0;
+    game->collect_anim_timer = 0;
 
     // Clear enemies
     int i;
