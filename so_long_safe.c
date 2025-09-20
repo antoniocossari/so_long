@@ -59,6 +59,10 @@ typedef struct s_game
 // Function prototypes
 int     load_sprites(t_game *game);
 int     load_map(t_game *game, char *filename);
+int     validate_map(t_game *game);
+int     check_file_extension(char *filename);
+int     flood_fill_check(t_game *game);
+void    fatal_error(char *message);
 int     next_eval(t_game *game);
 void    render_game(t_game *game);
 int     key_hook(int keycode, t_game *game);
@@ -71,6 +75,124 @@ void    render_ui(t_game *game);
 void    render_game_over_menu(t_game *game);
 int     restart_game(t_game *game, char *filename);
 
+void fatal_error(char *message)
+{
+    write(2, "Error\n", 6);
+    write(2, message, strlen(message));
+    write(2, "\n", 1);
+    exit(1);
+}
+
+int check_file_extension(char *filename)
+{
+    int len;
+
+    if (!filename)
+        return (0);
+    len = strlen(filename);
+    if (len < 4)
+        return (0);
+    return (strcmp(filename + len - 4, ".ber") == 0);
+}
+
+void flood_fill_recursive(char map[MAX_HEIGHT][MAX_WIDTH], int x, int y, int width, int height, char visited[MAX_HEIGHT][MAX_WIDTH])
+{
+    // Check bounds
+    if (x < 0 || x >= width || y < 0 || y >= height)
+        return;
+
+    // Check if already visited or is a wall
+    if (visited[y][x] == 1 || map[y][x] == '1')
+        return;
+
+    // Mark as visited
+    visited[y][x] = 1;
+
+    // Recursively check all 4 directions
+    flood_fill_recursive(map, x + 1, y, width, height, visited);
+    flood_fill_recursive(map, x - 1, y, width, height, visited);
+    flood_fill_recursive(map, x, y + 1, width, height, visited);
+    flood_fill_recursive(map, x, y - 1, width, height, visited);
+}
+
+int flood_fill_check(t_game *game)
+{
+    char visited[MAX_HEIGHT][MAX_WIDTH];
+    int x, y;
+
+    // Initialize visited array to 0
+    for (y = 0; y < game->map_height; y++)
+        for (x = 0; x < game->map_width; x++)
+            visited[y][x] = 0;
+
+    // Start flood fill from player position
+    flood_fill_recursive(game->map, game->player_x, game->player_y, game->map_width, game->map_height, visited);
+
+    // Check if all collectibles are reachable
+    for (y = 0; y < game->map_height; y++)
+    {
+        for (x = 0; x < game->map_width; x++)
+        {
+            if (game->map[y][x] == 'C' && visited[y][x] == 0)
+                fatal_error("Collectible not reachable from player position");
+            if (game->map[y][x] == 'E' && visited[y][x] == 0)
+                fatal_error("Exit not reachable from player position");
+        }
+    }
+
+    return (1);
+}
+
+int validate_map(t_game *game)
+{
+    int x, y;
+    int player_count = 0;
+    int exit_count = 0;
+    int collectible_count = 0;
+
+    // Check rectangle (all rows same length)
+    for (y = 0; y < game->map_height; y++)
+    {
+        if ((int)strlen(game->map[y]) != game->map_width)
+            fatal_error("Map is not rectangular");
+    }
+
+    // Check borders and count elements
+    for (y = 0; y < game->map_height; y++)
+    {
+        for (x = 0; x < game->map_width; x++)
+        {
+            char c = game->map[y][x];
+
+            // Check charset
+            if (c != '0' && c != '1' && c != 'C' && c != 'E' && c != 'P')
+                fatal_error("Invalid character in map");
+
+            // Check borders (allow exit on borders)
+            if ((y == 0 || y == game->map_height - 1 || x == 0 || x == game->map_width - 1) && c != '1' && c != 'E')
+                fatal_error("Map must be surrounded by walls");
+
+            // Count elements
+            if (c == 'P')
+                player_count++;
+            else if (c == 'E')
+                exit_count++;
+            else if (c == 'C')
+                collectible_count++;
+        }
+    }
+
+    // Validate counts
+    if (player_count != 1)
+        fatal_error("Map must have exactly one player");
+    if (exit_count != 1)
+        fatal_error("Map must have exactly one exit");
+    if (collectible_count < 1)
+        fatal_error("Map must have at least one collectible");
+
+    return (1);
+}
+
 int main(int argc, char **argv)
 {
     t_game game;
@@ -80,6 +202,10 @@ int main(int argc, char **argv)
         printf("Usage: %s <map_file.ber>\n", argv[0]);
         return (1);
     }
+
+    // Validate file extension
+    if (!check_file_extension(argv[1]))
+        fatal_error("File must have .ber extension");
 
     printf("🚀 Starting Escape from the Cluster...\n");
 
@@ -286,7 +412,6 @@ int load_map(t_game *game, char *filename)
             {
                 game->player_x = char_idx;
                 game->player_y = line_idx;
-                game->map[line_idx][char_idx] = '0';
                 printf("👤 Player found at: (%d,%d)\n", char_idx, line_idx);
             }
             else if (buffer[i] == 'C')
@@ -310,6 +435,17 @@ int load_map(t_game *game, char *filename)
 
     printf("✅ Map parsing complete\n");
     printf("📚 Collectibles found: %d\n", game->collectibles);
+
+    // Validate map format and content
+    validate_map(game);
+    printf("✅ Map validation passed\n");
+
+    // Check path connectivity with flood fill
+    flood_fill_check(game);
+    printf("✅ Path validation passed\n");
+
+    // Convert player position to empty space after validation
+    game->map[game->player_y][game->player_x] = '0';
 
     return (1);
 }
