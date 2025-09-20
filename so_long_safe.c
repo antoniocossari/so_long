@@ -15,14 +15,10 @@ typedef struct s_sprites
     void    *wall;
     void    *player;
     void    *player_walk;
-    void    *collectible_valgrind;
-    void    *collectible_norminette;
-    void    *collectible_tests;
+    void    *collectible;
     void    *exit_closed;
     void    *exit_open;
-    void    *enemy_norminette;
-    void    *enemy_segfault;
-    void    *enemy_memory_leak;
+    void    *enemy;
 } t_sprites;
 
 typedef struct s_enemy
@@ -81,7 +77,7 @@ int main(int argc, char **argv)
 
     if (argc != 2)
     {
-        printf("Usage: %s cluster_diagonali_small.ber\n", argv[0]);
+        printf("Usage: %s <map_file.ber>\n", argv[0]);
         return (1);
     }
 
@@ -193,17 +189,9 @@ int load_sprites(t_game *game)
     game->sprites.player_walk = mlx_xpm_file_to_image(game->mlx, "assets/player_peer_walk_32.xpm", &w, &h);
     if (!game->sprites.player_walk) { printf("❌ Failed to load player_peer_walk_32.xpm\n"); return (0); }
 
-    printf("📂 Loading collectible_valgrind...\n");
-    game->sprites.collectible_valgrind = mlx_xpm_file_to_image(game->mlx, "assets/collectible_32.xpm", &w, &h);
-    if (!game->sprites.collectible_valgrind) { printf("❌ Failed to load collectible_32.xpm for valgrind\n"); return (0); }
-
-    printf("📂 Loading collectible_norminette...\n");
-    game->sprites.collectible_norminette = mlx_xpm_file_to_image(game->mlx, "assets/collectible_32.xpm", &w, &h);
-    if (!game->sprites.collectible_norminette) { printf("❌ Failed to load collectible_32.xpm\n"); return (0); }
-
-    printf("📂 Loading collectible_tests...\n");
-    game->sprites.collectible_tests = mlx_xpm_file_to_image(game->mlx, "assets/collectible_32.xpm", &w, &h);
-    if (!game->sprites.collectible_tests) { printf("❌ Failed to load collectible_32.xpm\n"); return (0); }
+    printf("📂 Loading collectible...\n");
+    game->sprites.collectible = mlx_xpm_file_to_image(game->mlx, "assets/collectible_32.xpm", &w, &h);
+    if (!game->sprites.collectible) { printf("❌ Failed to load collectible_32.xpm\n"); return (0); }
 
     printf("📂 Loading exit_closed...\n");
     game->sprites.exit_closed = mlx_xpm_file_to_image(game->mlx, "assets/exit_32.xpm", &w, &h);
@@ -213,18 +201,9 @@ int load_sprites(t_game *game)
     game->sprites.exit_open = mlx_xpm_file_to_image(game->mlx, "assets/exit_open_32.xpm", &w, &h);
     if (!game->sprites.exit_open) { printf("❌ Failed to load exit_open_32.xpm\n"); return (0); }
 
-    // Load 32x32 enemy checkboxes (red)
-    printf("📂 Loading enemy_norminette...\n");
-    game->sprites.enemy_norminette = mlx_xpm_file_to_image(game->mlx, "assets/enemy_32.xpm", &w, &h);
-    if (!game->sprites.enemy_norminette) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
-
-    printf("📂 Loading enemy_segfault...\n");
-    game->sprites.enemy_segfault = mlx_xpm_file_to_image(game->mlx, "assets/enemy_32.xpm", &w, &h);
-    if (!game->sprites.enemy_segfault) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
-
-    printf("📂 Loading enemy_memory_leak...\n");
-    game->sprites.enemy_memory_leak = mlx_xpm_file_to_image(game->mlx, "assets/enemy_32.xpm", &w, &h);
-    if (!game->sprites.enemy_memory_leak) { printf("❌ Failed to load enemy_x_32.xpm\n"); return (0); }
+    printf("📂 Loading enemy...\n");
+    game->sprites.enemy = mlx_xpm_file_to_image(game->mlx, "assets/enemy_32.xpm", &w, &h);
+    if (!game->sprites.enemy) { printf("❌ Failed to load enemy_32.xpm\n"); return (0); }
 
 
     printf("✅ All sprites loaded successfully\n");
@@ -410,12 +389,6 @@ int next_eval(t_game *game)
     return (1);
 }
 
-void draw_rectangle(t_game *game, int x, int y, int width, int height, int color)
-{
-    for (int i = 0; i < width; i++)
-        for (int j = 0; j < height; j++)
-            mlx_pixel_put(game->mlx, game->window, x + i, y + j, color);
-}
 
 void render_game(t_game *game)
 {
@@ -442,14 +415,7 @@ void render_game(t_game *game)
             }
             else if (game->map[y][x] == 'C')
             {
-                // Rotate collectible types based on position for variety
-                int collectible_type = (x + y) % 3;
-                if (collectible_type == 0)
-                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible_valgrind, screen_x, screen_y);
-                else if (collectible_type == 1)
-                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible_norminette, screen_x, screen_y);
-                else
-                    mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible_tests, screen_x, screen_y);
+                mlx_put_image_to_window(game->mlx, game->window, game->sprites.collectible, screen_x, screen_y);
             }
             else if (game->map[y][x] == 'E')
             {
@@ -852,20 +818,20 @@ void render_enemies(t_game *game)
         int screen_x = game->enemies[i].x * 32;
         int screen_y = game->enemies[i].y * 32;
 
-        // Render based on enemy type
+        // Render enemy sprite (same for all types)
+        mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy, screen_x, screen_y);
+
+        // Render type-specific label
         if (game->enemies[i].type == 0) // norminette
         {
-            mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_norminette, screen_x, screen_y);
             mlx_string_put(game->mlx, game->window, screen_x + 2, screen_y - 10, 0xFF0000, "NORM");
         }
         else if (game->enemies[i].type == 1) // segfault
         {
-            mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_segfault, screen_x, screen_y);
             mlx_string_put(game->mlx, game->window, screen_x + 2, screen_y - 10, 0xFF0000, "SEGV");
         }
         else if (game->enemies[i].type == 2) // memory_leak
         {
-            mlx_put_image_to_window(game->mlx, game->window, game->sprites.enemy_memory_leak, screen_x, screen_y);
             mlx_string_put(game->mlx, game->window, screen_x + 1, screen_y - 10, 0xFF0000, "LEAK");
         }
     }
