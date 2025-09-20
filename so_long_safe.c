@@ -392,6 +392,7 @@ int next_eval(t_game *game)
     // Reset position and stats for new eval
     game->moves = 0; // Reset move counter for new eval
     game->collected = 0; // Reset collected counter for new eval
+    game->score = 0; // Reset score for new eval
     game->enemy_move_counter = 0; // Reset enemy movement counter
     game->player_anim_frame = 0; // Reset animation frame
     game->collect_anim_timer = 0; // Reset collection animation
@@ -452,15 +453,20 @@ void render_game(t_game *game)
             }
             else if (game->map[y][x] == 'E')
             {
+                char score_text[20];
+                sprintf(score_text, "%d/100", game->score);
+
                 if (game->collected == game->collectibles)
                 {
                     mlx_put_image_to_window(game->mlx, game->window, game->sprites.exit_open, screen_x, screen_y);
-                    mlx_string_put(game->mlx, game->window, screen_x + 8, screen_y - 10, 0x00FF00, "EXIT");
+                    mlx_string_put(game->mlx, game->window, screen_x + 8, screen_y - 18, 0x00FF00, "EXIT");
+                    mlx_string_put(game->mlx, game->window, screen_x + 5, screen_y - 5, 0x00FF00, score_text);
                 }
                 else
                 {
                     mlx_put_image_to_window(game->mlx, game->window, game->sprites.exit_closed, screen_x, screen_y);
-                    mlx_string_put(game->mlx, game->window, screen_x + 8, screen_y - 10, 0xFFD700, "EXIT");
+                    mlx_string_put(game->mlx, game->window, screen_x + 8, screen_y - 18, 0xFFD700, "EXIT");
+                    mlx_string_put(game->mlx, game->window, screen_x + 5, screen_y - 5, 0xFFD700, score_text);
                 }
             }
         }
@@ -619,8 +625,8 @@ void move_player(t_game *game, int new_x, int new_y)
 
         if (game->collected == game->collectibles)
         {
-            printf("\n🎉 EVAL %d PASSED! Completed in %d moves! 🎉\n",
-                   game->current_eval, game->moves + 1);
+            printf("\n🎉 EVAL %d PASSED! Score: %d/100 points in %d moves! 🎉\n",
+                   game->current_eval, game->score, game->moves + 1);
 
             // 3 EVAL PROGRESSION SYSTEM
             if (game->current_eval < 3)
@@ -638,7 +644,7 @@ void move_player(t_game *game, int new_x, int new_y)
             else
             {
                 printf("\n🏆 ALL 3 EVALS COMPLETED! ESCAPED FROM THE CLUSTER! 🏆\n");
-                printf("🎯 Final Score: %d/125 points\n", game->score);
+                printf("🎯 Final Eval Score: %d/100 points\n", game->score);
                 game->victory = 1;
                 game->game_over = 1;
                 game->game_over_reason = 1; // Victory
@@ -673,12 +679,11 @@ void move_player(t_game *game, int new_x, int new_y)
         game->collect_anim_y = new_y;
         game->collect_anim_timer = 10; // Animation lasts 10 frames
 
-        // Dynamic scoring: ensure exactly 100 points per level
+        // Simple scoring: 100 points max per eval
         int points_to_add;
         if (game->collected == game->collectibles) {
             // Last collectible: award remaining points to reach exactly 100
-            int current_level_target = (game->current_eval * 100);
-            points_to_add = current_level_target - game->score;
+            points_to_add = 100 - game->score;
         } else {
             // Regular collectible: award base points
             points_to_add = 100 / game->collectibles;
@@ -717,7 +722,7 @@ void move_player(t_game *game, int new_x, int new_y)
             else if (game->enemies[i].type == 2)
                 printf("MEMORY LEAK!\n");
 
-            printf("🎯 Final score: %d points\n", game->score);
+            printf("🎯 Eval %d score: %d/100 points\n", game->current_eval, game->score);
             game->game_over = 1;
             game->game_over_reason = 0; // Enemy collision
             render_game(game);
@@ -732,7 +737,7 @@ void move_player(t_game *game, int new_x, int new_y)
 int close_game(t_game *game)
 {
     // Clean up and exit
-    printf("🎯 Final score: %d points\n", game->score);
+    printf("🎯 Final score: %d/100 points\n", game->score);
     printf("👋 Thanks for playing Escape from the Cluster!\n");
 
     if (game->window)
@@ -874,28 +879,20 @@ void render_ui(t_game *game)
     int ui_color = 0xFFFFFF; // White text
     int shadow_color = 0x000000; // Black shadow
 
-    // Top-left corner UI
-    int ui_x = 10;
-    int ui_y = 10;
+    // UI block positioned over the map for better visibility
+    int ui_x = 50;  // More to the right
+    int ui_y = 50;  // More down
     int line_height = 15;
 
-    // Eval progress
+    // Eval progress - larger and more visible
     sprintf(text, "EVAL %d/3", game->current_eval);
+    mlx_string_put(game->mlx, game->window, ui_x + 2, ui_y + 2, shadow_color, text);
     mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
-    mlx_string_put(game->mlx, game->window, ui_x, ui_y, ui_color, text);
+    mlx_string_put(game->mlx, game->window, ui_x, ui_y, 0xFFD700, text); // Gold for better visibility
     ui_y += line_height;
 
-    // Score
-    sprintf(text, "SCORE: %d", game->score);
-    mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
-    mlx_string_put(game->mlx, game->window, ui_x, ui_y, ui_color, text);
-    ui_y += line_height;
 
-    // Collectibles progress
-    sprintf(text, "TASKS: %d/%d", game->collected, game->collectibles);
-    mlx_string_put(game->mlx, game->window, ui_x + 1, ui_y + 1, shadow_color, text);
-    mlx_string_put(game->mlx, game->window, ui_x, ui_y, ui_color, text);
-    ui_y += line_height;
+
 
     // Move counter
     sprintf(text, "MOVES: %d", game->moves);
@@ -926,10 +923,10 @@ void render_game_over_menu(t_game *game)
     int center_x = (game->map_width * TILE_SIZE) / 2;
     int center_y = (game->map_height * TILE_SIZE) / 2;
 
-    // Background box for menu
+    // Background box for menu - more balanced
     for (int i = -80; i < 80; i++)
     {
-        for (int j = -60; j < 60; j++)
+        for (int j = -35; j < 35; j++)  // Smaller vertical size
         {
             if (center_x + i >= 0 && center_x + i < game->map_width * TILE_SIZE &&
                 center_y + j >= 0 && center_y + j < game->map_height * TILE_SIZE)
@@ -940,28 +937,22 @@ void render_game_over_menu(t_game *game)
     }
 
     int menu_x = center_x - 70;
-    int menu_y = center_y - 50;
-    int line_height = 20;
+    int menu_y = center_y - 15;  // A bit more space above
+    int line_height = 18;
 
     // Title
     if (game->game_over_reason == 1) // Victory
     {
-        sprintf(text, "🏆 VICTORY! 🏆");
+        sprintf(text, "VICTORY!");
         mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0x00FF00, text);
-        menu_y += line_height;
-        sprintf(text, "Score: %d points", game->score);
-        mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFFFFFF, text);
     }
     else // Game Over
     {
-        sprintf(text, "💀 GAME OVER 💀");
+        sprintf(text, "GAME OVER");
         mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFF0000, text);
-        menu_y += line_height;
-        sprintf(text, "Score: %d points", game->score);
-        mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFFFFFF, text);
     }
 
-    menu_y += line_height * 2;
+    menu_y += line_height + 5;  // Small extra space after title
 
     // Menu options
     sprintf(text, "R - Restart");
@@ -970,6 +961,7 @@ void render_game_over_menu(t_game *game)
 
     sprintf(text, "ESC/Q - Quit");
     mlx_string_put(game->mlx, game->window, menu_x, menu_y, 0xFFFFFF, text);
+    menu_y += line_height;
 }
 
 int restart_game(t_game *game, char *filename)
