@@ -1,6 +1,6 @@
-NAME = so_long
+NAME = so_long_safe_linux
 
-SRCS = working_game_mlx.c
+SRCS = so_long_safe.c
 
 OBJS = $(SRCS:.c=.o)
 
@@ -31,6 +31,6 @@ fclean: clean
 re: fclean all
 
 test: $(NAME)
-	./$(NAME) example_map.ber
+	./$(NAME) eval1.ber
 
 .PHONY: all clean fclean re test
