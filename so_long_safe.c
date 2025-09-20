@@ -58,6 +58,7 @@ typedef struct s_game
 
 // Function prototypes
 int     load_sprites(t_game *game);
+void    destroy_sprites(t_game *game);
 int     load_map(t_game *game, char *filename);
 int     validate_map(t_game *game);
 int     check_file_extension(char *filename);
@@ -226,6 +227,17 @@ int main(int argc, char **argv)
     game.collect_anim_timer = 0;
     game.game_over = 0;
     game.game_over_reason = 0;
+
+    // Initialize sprite pointers to NULL
+    game.sprites.floor = NULL;
+    game.sprites.wall = NULL;
+    game.sprites.player = NULL;
+    game.sprites.player_walk = NULL;
+    game.sprites.collectible = NULL;
+    game.sprites.exit_closed = NULL;
+    game.sprites.exit_open = NULL;
+    game.sprites.enemy = NULL;
+
     int i;
     for (i = 0; i < 9; i++)
         game.enemies[i].active = 0;
@@ -334,6 +346,26 @@ int load_sprites(t_game *game)
 
     printf("✅ All sprites loaded successfully\n");
     return (1);
+}
+
+void destroy_sprites(t_game *game)
+{
+    if (game->sprites.floor)
+        mlx_destroy_image(game->mlx, game->sprites.floor);
+    if (game->sprites.wall)
+        mlx_destroy_image(game->mlx, game->sprites.wall);
+    if (game->sprites.player)
+        mlx_destroy_image(game->mlx, game->sprites.player);
+    if (game->sprites.player_walk)
+        mlx_destroy_image(game->mlx, game->sprites.player_walk);
+    if (game->sprites.collectible)
+        mlx_destroy_image(game->mlx, game->sprites.collectible);
+    if (game->sprites.exit_closed)
+        mlx_destroy_image(game->mlx, game->sprites.exit_closed);
+    if (game->sprites.exit_open)
+        mlx_destroy_image(game->mlx, game->sprites.exit_open);
+    if (game->sprites.enemy)
+        mlx_destroy_image(game->mlx, game->sprites.enemy);
 }
 
 int load_map(t_game *game, char *filename)
@@ -842,8 +874,19 @@ int close_game(t_game *game)
     printf("🎯 Final score: %d/100 points\n", game->score);
     printf("👋 Thanks for playing Escape from the Cluster!\n");
 
+    // Destroy all sprites
+    destroy_sprites(game);
+
+    // Destroy window
     if (game->window)
         mlx_destroy_window(game->mlx, game->window);
+
+    // Destroy MLX instance (Linux specific)
+    if (game->mlx)
+    {
+        mlx_destroy_display(game->mlx);
+        free(game->mlx);
+    }
 
     exit(0);
     return (0);
