@@ -1,23 +1,26 @@
-NAME = so_long_runner
+NAME = so_long
 
-SRCS = main_mlx42.c
+SRCS = working_game_mlx.c
 
 OBJS = $(SRCS:.c=.o)
 
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -g
 
-# MLX42 flags
-MLX_PATH = ./MLX42
-MLX_FLAGS = -L$(MLX_PATH)/build -lmlx42 -L$(MLX_PATH)/build/_deps/glfw-build/src -lglfw3 -framework OpenGL -framework Cocoa -framework IOKit
+# MinilibX flags
+MLX_PATH = ./minilibx-linux
+MLX_FLAGS = -L$(MLX_PATH) -lmlx -lXext -lX11 -lm
 
-all: $(NAME)
+all: $(MLX_PATH)/libmlx.a $(NAME)
+
+$(MLX_PATH)/libmlx.a:
+	make -C $(MLX_PATH)
 
 $(NAME): $(OBJS)
 	$(CC) $(OBJS) $(MLX_FLAGS) -o $(NAME)
 
-%.o: %.c so_long_runner.h
-	$(CC) $(CFLAGS) -c $< -o $@
+%.o: %.c
+	$(CC) $(CFLAGS) -I$(MLX_PATH) -c $< -o $@
 
 clean:
 	rm -f $(OBJS)

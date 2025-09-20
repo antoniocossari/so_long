@@ -1,4 +1,4 @@
-#include "mlx_mac/minilibx/mlx.h"
+#include "minilibx-linux/mlx.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -492,13 +492,13 @@ int key_hook(int keycode, t_game *game)
     // Handle game over menu
     if (game->game_over)
     {
-        if (keycode == 53) // ESC
+        if (keycode == 65307) // ESC
         {
             printf("🚪 ESC pressed - exiting\n");
             close_game(game);
             return (0);
         }
-        else if (keycode == 15) // R - Restart
+        else if (keycode == 114) // R - Restart
         {
             printf("🔄 Restarting game...\n");
             if (restart_game(game, "cluster_diagonali_small.ber"))
@@ -508,7 +508,7 @@ int key_hook(int keycode, t_game *game)
             }
             return (0);
         }
-        else if (keycode == 12) // Q - Quit
+        else if (keycode == 113) // Q - Quit
         {
             printf("👋 Quitting game...\n");
             close_game(game);
@@ -521,7 +521,7 @@ int key_hook(int keycode, t_game *game)
     int new_y = game->player_y;
 
     // Handle key presses - STANDARD so_long keycodes
-    if (keycode == 53) // ESC
+    if (keycode == 65307) // ESC
     {
         printf("🚪 ESC pressed - exiting\n");
         close_game(game);
@@ -529,22 +529,22 @@ int key_hook(int keycode, t_game *game)
     }
 
     // WASD movement (standard so_long)
-    if (keycode == 13) // W
+    if (keycode == 119) // W
         new_y--;
-    else if (keycode == 1) // S
+    else if (keycode == 115) // S
         new_y++;
-    else if (keycode == 0) // A
+    else if (keycode == 97) // A
         new_x--;
-    else if (keycode == 2) // D
+    else if (keycode == 100) // D
         new_x++;
     // Arrow keys (alternative)
-    else if (keycode == 126) // UP
+    else if (keycode == 65362) // UP
         new_y--;
-    else if (keycode == 125) // DOWN
+    else if (keycode == 65364) // DOWN
         new_y++;
-    else if (keycode == 123) // LEFT
+    else if (keycode == 65361) // LEFT
         new_x--;
-    else if (keycode == 124) // RIGHT
+    else if (keycode == 65363) // RIGHT
         new_x++;
     else
         return (0); // Ignore other keys
